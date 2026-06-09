@@ -1,0 +1,19 @@
+{
+  "rows": 1000,
+  "outcome_true_ratio": 0.1,
+  "output_base": "output/littlebank",
+  "ranges": {
+    "num_contacts": {"min": 1, "max": 10},
+    "days_since_previous": {"min": 0, "max": 30},
+    "num_contacts_previous": {"min": 0, "max": 10},
+    "age": {"min": 16, "max": 80},
+    "call_centre_volume": {"min": 0.0, "max": 15.0},
+    "high_temp": {"min": -2, "max": 45},
+    "low_temp": {"min": -15, "max": 20},
+    "forward_rate": {"min": 0.05, "max": 5.05},
+    "num_employed": {"min": 23040.0, "max": 24269.0},
+    "consumer_confidence": {"min": -50.0, "max": -26.0},
+    "price_index": {"min": 253.0, "max": 261.0},
+    "employment_variation": {"min": -3.04, "max": 1.26}
+  }
+}
