@@ -1,4 +1,17 @@
 {
+  "_help": {
+    "note": "JSON has no comments; this _help block is documentation only and is ignored by the generator.",
+    "distribution": "Sets the distribution for numeric columns. Use top-level 'distribution' for the global default, or add a 'distribution' key inside any ranges entry to override it per column.",
+    "available_distributions": {
+      "normal": "Gaussian centred on the range midpoint (std = range/6).",
+      "uniform": "Flat/even across [min, max].",
+      "exponential": "Right-skewed, anchored at min (scale = range/3).",
+      "poisson": "Discrete counts, anchored at min (lam = range/2).",
+      "binomial": "Discrete, anchored at min (n = round(range), p = 0.5).",
+      "random": "Uniform within range (the 'absolute random' mode; alias of uniform)."
+    },
+    "optional_params": "Each ranges entry may also include a 'params' object to tune a distribution, e.g. normal: {mean, std}; exponential: {scale}; poisson: {lam}; binomial: {n, p}."
+  },
   "rows": 1000,
   "outcome_true_ratio": 0.1,
   "output_base": "output/littlebank",
