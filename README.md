@@ -28,8 +28,11 @@ This writes a dated CSV, e.g. `output/littlebank_2026-06-09.csv`
 | `outcome_true_ratio` | Fraction of `outcome` values that are `True` (0–1). e.g. `0.1` → 10% True, 90% False. |
 | `output_base` | Output path prefix; the run date and `.csv` are appended. |
 | `distribution` | Global default distribution for all numeric columns (see below). |
-| `params` | Optional global distribution parameters (see below). |
+| `params` | Optional global distribution parameters for numeric columns (see below). |
 | `ranges` | Optional per-column numeric `{ "min", "max", "distribution", "params" }` overrides. Omit a column to use its schema default. |
+| `categorical_distribution` | Global default distribution for all categorical columns. Defaults to `uniform`. |
+| `categorical_params` | Optional global distribution parameters for categorical columns. |
+| `categorical` | Optional per-column categorical `{ "distribution", "params" }` overrides, keyed by column name. |
 
 Only numeric columns can appear under `ranges`. Names, types, and categorical
 values are not configurable.
@@ -68,10 +71,33 @@ Example — global default with per-column overrides:
 }
 ```
 
+### Categorical columns
+
+The same six distributions apply to categorical columns. The distribution is
+mapped onto the **category order** (index `0 … k-1` as declared in the schema):
+`normal` favours the middle categories, `exponential`/`poisson` favour the
+first ones, `binomial` centres them, and `uniform`/`random` weight every
+category equally (the default). Set it globally with `categorical_distribution`
+and/or per column in the `categorical` block:
+
+```json
+{
+  "rows": 1000,
+  "outcome_true_ratio": 0.1,
+  "categorical_distribution": "uniform",
+  "categorical": {
+    "month": {"distribution": "normal"},
+    "job": {"distribution": "exponential"}
+  }
+}
+```
+
 ## How values are generated
 
 - **`contact_id`** — unique sequential integers starting at 1.
-- **Categorical columns** — sampled uniformly from their fixed allowed values.
+- **Categorical columns** — sampled from their fixed allowed values, uniformly
+  by default or shaped by a configurable distribution (see
+  [Categorical columns](#categorical-columns)).
 - **Numeric columns** — drawn from a configurable distribution (see
   [Distributions](#distributions)), clipped to `[min, max]`. Integers are
   rounded; floats are rounded to 4 decimal places.

@@ -63,6 +63,25 @@ def resolve_distribution(column, config):
     return distribution, params
 
 
+def resolve_categorical_distribution(column, config):
+    """Return the (distribution, params) for a categorical column.
+
+    Precedence: per-column entry in the 'categorical' block >
+    global 'categorical_distribution' > the default ('uniform', preserving the
+    original behaviour). Per-column 'params' override global 'categorical_params'.
+    """
+    cat_cfg = config.get("categorical", {})
+    override = cat_cfg.get(column.name, {})
+
+    distribution = override.get(
+        "distribution",
+        config.get("categorical_distribution", gen.UNIFORM),
+    )
+    params = dict(config.get("categorical_params", {}))
+    params.update(override.get("params", {}))
+    return distribution, params
+
+
 def validate_config(config):
     rows = config.get("rows")
     if not isinstance(rows, int) or rows <= 0:
@@ -78,6 +97,26 @@ def validate_config(config):
             f"unknown 'distribution': {global_dist!r}. "
             f"Choose from {sorted(gen.DISTRIBUTIONS)}"
         )
+
+    global_cat_dist = config.get("categorical_distribution", gen.UNIFORM)
+    if global_cat_dist not in gen.DISTRIBUTIONS:
+        raise ValueError(
+            f"unknown 'categorical_distribution': {global_cat_dist!r}. "
+            f"Choose from {sorted(gen.DISTRIBUTIONS)}"
+        )
+
+    for name, entry in config.get("categorical", {}).items():
+        col = COLUMNS_BY_NAME.get(name)
+        if col is None or col.kind != KIND_CATEGORICAL:
+            raise ValueError(
+                f"config 'categorical' has unknown/non-categorical column: {name!r}"
+            )
+        dist = entry.get("distribution")
+        if dist is not None and dist not in gen.DISTRIBUTIONS:
+            raise ValueError(
+                f"unknown categorical distribution for {name!r}: {dist!r}. "
+                f"Choose from {sorted(gen.DISTRIBUTIONS)}"
+            )
 
     config_ranges = config.get("ranges", {})
     for name in config_ranges:
@@ -109,7 +148,10 @@ def build_dataframe(config):
         if column.kind == KIND_ID:
             data[column.name] = gen.sequential_ids(rows)
         elif column.kind == KIND_CATEGORICAL:
-            data[column.name] = gen.categorical(rows, column.categories)
+            distribution, params = resolve_categorical_distribution(column, config)
+            data[column.name] = gen.categorical(
+                rows, column.categories, distribution, params
+            )
         elif column.kind in (KIND_INT, KIND_FLOAT):
             low, high = resolve_range(column, config_ranges)
             distribution, params = resolve_distribution(column, config)

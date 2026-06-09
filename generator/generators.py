@@ -74,9 +74,21 @@ def numeric(rows, low, high, kind, distribution=DEFAULT_DISTRIBUTION, params=Non
     return np.round(clipped, FLOAT_DECIMALS)
 
 
-def categorical(rows, categories):
-    """Uniformly sampled categorical values."""
-    return np.random.choice(np.asarray(categories, dtype=object), size=rows)
+def categorical(rows, categories, distribution=UNIFORM, params=None):
+    """Sample categorical values, optionally shaped by a distribution.
+
+    With 'uniform'/'random' every category is equally likely. For the other
+    distributions, the distribution is mapped onto the category index range
+    [0, k-1] using the same numeric generator, so e.g. 'normal' favours the
+    middle categories and 'exponential' favours the first ones. Category order
+    is the order declared in the schema.
+    """
+    cats = np.asarray(categories, dtype=object)
+    k = len(cats)
+    if k <= 1 or distribution in (UNIFORM, RANDOM):
+        return np.random.choice(cats, size=rows)
+    idx = numeric(rows, 0, k - 1, KIND_INT, distribution, params or {})
+    return cats[idx]
 
 
 def boolean_by_ratio(rows, true_ratio):

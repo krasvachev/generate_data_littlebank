@@ -1,21 +1,28 @@
 {
   "_help": {
     "note": "JSON has no comments; this _help block is documentation only and is ignored by the generator.",
-    "distribution": "Sets the distribution for numeric columns. Use top-level 'distribution' for the global default, or add a 'distribution' key inside any ranges entry to override it per column.",
+    "distribution": "Numeric columns: top-level 'distribution' is the global default; add a 'distribution' key inside any ranges entry to override per column.",
+    "categorical_distribution": "Categorical columns: top-level 'categorical_distribution' is the global default (defaults to 'uniform'); add a per-column entry in the 'categorical' block to override. The distribution is mapped onto the category order (e.g. normal favours middle categories, exponential favours the first ones).",
     "available_distributions": {
-      "normal": "Gaussian centred on the range midpoint (std = range/6).",
-      "uniform": "Flat/even across [min, max].",
-      "exponential": "Right-skewed, anchored at min (scale = range/3).",
-      "poisson": "Discrete counts, anchored at min (lam = range/2).",
-      "binomial": "Discrete, anchored at min (n = round(range), p = 0.5).",
-      "random": "Uniform within range (the 'absolute random' mode; alias of uniform)."
+      "normal": "Gaussian centred on the midpoint (numeric: std = range/6; categorical: middle categories).",
+      "uniform": "Flat/even across the range or categories.",
+      "exponential": "Right-skewed toward the minimum / first categories.",
+      "poisson": "Discrete counts, anchored at the minimum / first categories.",
+      "binomial": "Discrete, centred (n = round(range), p = 0.5).",
+      "random": "Uniform within range / across categories (the 'absolute random' mode; alias of uniform)."
     },
-    "optional_params": "Each ranges entry may also include a 'params' object to tune a distribution, e.g. normal: {mean, std}; exponential: {scale}; poisson: {lam}; binomial: {n, p}."
+    "optional_params": "Each ranges/categorical entry may include a 'params' object to tune a distribution, e.g. normal: {mean, std}; exponential: {scale}; poisson: {lam}; binomial: {n, p}."
   },
   "rows": 1000,
   "outcome_true_ratio": 0.1,
   "output_base": "output/littlebank",
   "distribution": "normal",
+  "categorical_distribution": "uniform",
+  "categorical": {
+    "month": {"distribution": "normal"},
+    "day_of_week": {"distribution": "uniform"},
+    "job": {"distribution": "exponential"}
+  },
   "ranges": {
     "num_contacts": {"min": 1, "max": 10},
     "days_since_previous": {"min": 0, "max": 30, "distribution": "poisson"},

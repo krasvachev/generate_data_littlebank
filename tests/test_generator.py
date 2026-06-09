@@ -4,7 +4,12 @@ import numpy as np
 import pytest
 
 from generator import generators as gen
-from generator.cli import build_dataframe, resolve_distribution, validate_config
+from generator.cli import (
+    build_dataframe,
+    resolve_categorical_distribution,
+    resolve_distribution,
+    validate_config,
+)
 from generator.schema import (
     COLUMN_ORDER,
     COLUMNS,
@@ -161,4 +166,86 @@ def test_invalid_distribution_rejected():
             "rows": 10,
             "outcome_true_ratio": 0.1,
             "ranges": {"age": {"min": 16, "max": 80, "distribution": "bogus"}},
+        })
+
+
+# --- categorical distributions ---
+
+@pytest.mark.parametrize("distribution", sorted(gen.DISTRIBUTIONS))
+def test_categorical_distributions_stay_in_category_set(distribution):
+    """Every categorical distribution still yields only allowed values."""
+    np.random.seed(6)
+    config = {
+        "rows": 3000,
+        "outcome_true_ratio": 0.2,
+        "categorical_distribution": distribution,
+    }
+    df = build_dataframe(config)
+    for col in COLUMNS:
+        if col.kind == KIND_CATEGORICAL:
+            assert set(df[col.name].unique()).issubset(set(col.categories)), (
+                distribution, col.name
+            )
+
+
+def test_categorical_uniform_is_default():
+    """No categorical config -> uniform sampling (backward compatible)."""
+    col = COLUMNS_BY_NAME["month"]
+    dist, _ = resolve_categorical_distribution(col, {"rows": 1})
+    assert dist == gen.UNIFORM
+
+
+def test_categorical_per_column_overrides_global():
+    config = {
+        "categorical_distribution": "exponential",
+        "categorical": {"month": {"distribution": "normal"}},
+    }
+    assert resolve_categorical_distribution(COLUMNS_BY_NAME["month"], config)[0] == "normal"
+    # A column without an override uses the global categorical default.
+    assert resolve_categorical_distribution(COLUMNS_BY_NAME["job"], config)[0] == "exponential"
+
+
+def test_categorical_exponential_favours_first_categories():
+    """exponential should make early categories far more common than late ones."""
+    np.random.seed(7)
+    config = {
+        "rows": 20000,
+        "outcome_true_ratio": 0.1,
+        "categorical": {"month": {"distribution": "exponential"}},
+    }
+    counts = build_dataframe(config)["month"].value_counts()
+    assert counts.get("jan", 0) > counts.get("dec", 0)
+
+
+def test_categorical_normal_favours_middle_categories():
+    np.random.seed(8)
+    config = {
+        "rows": 20000,
+        "outcome_true_ratio": 0.1,
+        "categorical": {"month": {"distribution": "normal"}},
+    }
+    counts = build_dataframe(config)["month"].value_counts()
+    assert counts.get("jun", 0) > counts.get("jan", 0)
+    assert counts.get("jul", 0) > counts.get("dec", 0)
+
+
+def test_invalid_categorical_distribution_rejected():
+    with pytest.raises(ValueError):
+        validate_config({
+            "rows": 10,
+            "outcome_true_ratio": 0.1,
+            "categorical_distribution": "nope",
+        })
+    with pytest.raises(ValueError):
+        validate_config({
+            "rows": 10,
+            "outcome_true_ratio": 0.1,
+            "categorical": {"month": {"distribution": "nope"}},
+        })
+    with pytest.raises(ValueError):
+        # 'age' is numeric, not categorical.
+        validate_config({
+            "rows": 10,
+            "outcome_true_ratio": 0.1,
+            "categorical": {"age": {"distribution": "normal"}},
         })
