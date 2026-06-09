@@ -1,14 +1,36 @@
 """Per-column value generators.
 
-Numeric columns use a normal distribution centred on the midpoint of their
-range with std = (max - min) / 6, clipped to the range bounds. Categorical
-columns are sampled uniformly. The unique-ID column is sequential, and the
-boolean target is produced from an exact class ratio and shuffled.
+Numeric columns are drawn from one of six selectable distributions, then
+clipped to the column's range and rounded according to its type (ints to whole
+numbers, floats to FLOAT_DECIMALS places). Categorical columns are sampled
+uniformly, the unique-ID column is sequential, and the boolean target is
+produced from an exact class ratio and shuffled.
+
+Supported distributions (see DISTRIBUTIONS):
+    normal       - Gaussian centred on the range midpoint (std = range/6).
+    uniform      - uniform across [min, max].
+    exponential  - right-skewed, anchored at min (scale = range/3).
+    poisson      - discrete counts, anchored at min (lam = range/2).
+    binomial     - discrete, anchored at min (n = round(range), p = 0.5).
+    random       - alias for uniform within range (the "absolute random" mode).
+
+Each distribution accepts optional per-column parameters (see _sample).
 """
 
 import numpy as np
 
-from .schema import FLOAT_DECIMALS
+from .schema import KIND_INT, FLOAT_DECIMALS
+
+NORMAL = "normal"
+UNIFORM = "uniform"
+EXPONENTIAL = "exponential"
+POISSON = "poisson"
+BINOMIAL = "binomial"
+RANDOM = "random"  # absolute random == uniform within range
+
+DISTRIBUTIONS = {NORMAL, UNIFORM, EXPONENTIAL, POISSON, BINOMIAL, RANDOM}
+
+DEFAULT_DISTRIBUTION = NORMAL
 
 
 def sequential_ids(rows, start=1):
@@ -16,26 +38,40 @@ def sequential_ids(rows, start=1):
     return np.arange(start, start + rows, dtype=np.int64)
 
 
-def _normal_clipped(rows, low, high):
-    """Normal sample centred on the midpoint, clipped to [low, high]."""
-    mean = (low + high) / 2.0
-    std = (high - low) / 6.0
-    if std == 0:
-        return np.full(rows, mean, dtype=float)
-    values = np.random.normal(loc=mean, scale=std, size=rows)
-    return np.clip(values, low, high)
+def _sample(distribution, rows, low, high, params):
+    """Draw raw (unclipped, unrounded) values for the given distribution."""
+    span = high - low
+    if distribution == NORMAL:
+        mean = params.get("mean", (low + high) / 2.0)
+        std = params.get("std", span / 6.0)
+        if std == 0:
+            return np.full(rows, mean, dtype=float)
+        return np.random.normal(loc=mean, scale=std, size=rows)
+    if distribution in (UNIFORM, RANDOM):
+        return np.random.uniform(low, high, size=rows)
+    if distribution == EXPONENTIAL:
+        scale = params.get("scale", span / 3.0 if span else 1.0)
+        return low + np.random.exponential(scale=scale, size=rows)
+    if distribution == POISSON:
+        lam = params.get("lam", span / 2.0)
+        return low + np.random.poisson(lam=lam, size=rows)
+    if distribution == BINOMIAL:
+        n = params.get("n", max(int(round(span)), 1))
+        p = params.get("p", 0.5)
+        return low + np.random.binomial(n=n, p=p, size=rows)
+    raise ValueError(f"unknown distribution: {distribution!r}")
 
 
-def integers(rows, low, high):
-    """Integers in [low, high] from a clipped normal distribution."""
-    values = _normal_clipped(rows, low, high)
-    return np.rint(values).astype(np.int64)
+def numeric(rows, low, high, kind, distribution=DEFAULT_DISTRIBUTION, params=None):
+    """Generate a numeric column: sample -> clip to [low, high] -> round.
 
-
-def floats(rows, low, high, decimals=FLOAT_DECIMALS):
-    """Floats in [low, high] from a clipped normal distribution, rounded."""
-    values = _normal_clipped(rows, low, high)
-    return np.round(values, decimals)
+    Ints are rounded to whole numbers; floats to FLOAT_DECIMALS places.
+    """
+    raw = _sample(distribution, rows, low, high, params or {})
+    clipped = np.clip(raw, low, high)
+    if kind == KIND_INT:
+        return np.rint(clipped).astype(np.int64)
+    return np.round(clipped, FLOAT_DECIMALS)
 
 
 def categorical(rows, categories):

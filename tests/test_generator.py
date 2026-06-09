@@ -3,10 +3,12 @@
 import numpy as np
 import pytest
 
-from generator.cli import build_dataframe
+from generator import generators as gen
+from generator.cli import build_dataframe, resolve_distribution, validate_config
 from generator.schema import (
     COLUMN_ORDER,
     COLUMNS,
+    COLUMNS_BY_NAME,
     FLOAT_DECIMALS,
     GREATER_THAN_RULES,
     ID_COLUMN,
@@ -95,3 +97,68 @@ def test_range_override():
     df = build_dataframe(config)
     assert df["age"].min() >= 30
     assert df["age"].max() <= 40
+
+
+@pytest.mark.parametrize("distribution", sorted(gen.DISTRIBUTIONS))
+def test_all_distributions_respect_range(distribution):
+    """Every distribution still produces values within each column's range."""
+    np.random.seed(3)
+    config = {
+        "rows": 3000,
+        "outcome_true_ratio": 0.2,
+        "distribution": distribution,
+        "ranges": {},
+    }
+    df = build_dataframe(config)
+    for col in COLUMNS:
+        if col.kind in (KIND_INT, KIND_FLOAT):
+            low, high = col.default_range
+            assert df[col.name].min() >= low, (distribution, col.name)
+            assert df[col.name].max() <= high, (distribution, col.name)
+
+
+def test_discrete_distributions_are_integers_for_float_columns():
+    """poisson/binomial yield whole numbers even before float rounding."""
+    np.random.seed(4)
+    for distribution in ("poisson", "binomial"):
+        vals = gen.numeric(
+            2000, 0.0, 15.0, KIND_FLOAT, distribution=distribution
+        )
+        assert (vals == np.round(vals)).all(), distribution
+
+
+def test_per_column_distribution_overrides_global():
+    config = {
+        "rows": 10,
+        "outcome_true_ratio": 0.5,
+        "distribution": "normal",
+        "ranges": {"age": {"min": 16, "max": 80, "distribution": "uniform"}},
+    }
+    dist, _ = resolve_distribution(COLUMNS_BY_NAME["age"], config)
+    assert dist == "uniform"
+    # A column without an override falls back to the global default.
+    dist2, _ = resolve_distribution(COLUMNS_BY_NAME["call_centre_volume"], config)
+    assert dist2 == "normal"
+
+
+def test_random_alias_matches_uniform_bounds():
+    """'random' (absolute random) stays within range like uniform."""
+    np.random.seed(5)
+    vals = gen.numeric(5000, -3.04, 1.26, KIND_FLOAT, distribution="random")
+    assert vals.min() >= -3.04
+    assert vals.max() <= 1.26
+
+
+def test_invalid_distribution_rejected():
+    with pytest.raises(ValueError):
+        validate_config({
+            "rows": 10,
+            "outcome_true_ratio": 0.1,
+            "distribution": "not_a_distribution",
+        })
+    with pytest.raises(ValueError):
+        validate_config({
+            "rows": 10,
+            "outcome_true_ratio": 0.1,
+            "ranges": {"age": {"min": 16, "max": 80, "distribution": "bogus"}},
+        })

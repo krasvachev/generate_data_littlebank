@@ -45,6 +45,24 @@ def resolve_range(column, config_ranges):
     return column.default_range
 
 
+def resolve_distribution(column, config):
+    """Return the (distribution, params) for a numeric column.
+
+    Precedence: per-column 'distribution' in ranges > global 'distribution' >
+    the built-in default. Per-column 'params' override global 'params'.
+    """
+    config_ranges = config.get("ranges", {})
+    override = config_ranges.get(column.name, {})
+
+    distribution = override.get(
+        "distribution",
+        config.get("distribution", gen.DEFAULT_DISTRIBUTION),
+    )
+    params = dict(config.get("params", {}))
+    params.update(override.get("params", {}))
+    return distribution, params
+
+
 def validate_config(config):
     rows = config.get("rows")
     if not isinstance(rows, int) or rows <= 0:
@@ -53,6 +71,13 @@ def validate_config(config):
     ratio = config.get("outcome_true_ratio")
     if not isinstance(ratio, (int, float)) or not 0 <= ratio <= 1:
         raise ValueError("config 'outcome_true_ratio' must be between 0 and 1")
+
+    global_dist = config.get("distribution", gen.DEFAULT_DISTRIBUTION)
+    if global_dist not in gen.DISTRIBUTIONS:
+        raise ValueError(
+            f"unknown 'distribution': {global_dist!r}. "
+            f"Choose from {sorted(gen.DISTRIBUTIONS)}"
+        )
 
     config_ranges = config.get("ranges", {})
     for name in config_ranges:
@@ -66,6 +91,12 @@ def validate_config(config):
             raise ValueError(f"range for {name!r} needs both 'min' and 'max'")
         if float(rng["min"]) > float(rng["max"]):
             raise ValueError(f"range for {name!r} has min > max")
+        dist = rng.get("distribution")
+        if dist is not None and dist not in gen.DISTRIBUTIONS:
+            raise ValueError(
+                f"unknown distribution for {name!r}: {dist!r}. "
+                f"Choose from {sorted(gen.DISTRIBUTIONS)}"
+            )
 
 
 def build_dataframe(config):
@@ -79,12 +110,14 @@ def build_dataframe(config):
             data[column.name] = gen.sequential_ids(rows)
         elif column.kind == KIND_CATEGORICAL:
             data[column.name] = gen.categorical(rows, column.categories)
-        elif column.kind == KIND_INT:
+        elif column.kind in (KIND_INT, KIND_FLOAT):
             low, high = resolve_range(column, config_ranges)
-            data[column.name] = gen.integers(rows, int(low), int(high))
-        elif column.kind == KIND_FLOAT:
-            low, high = resolve_range(column, config_ranges)
-            data[column.name] = gen.floats(rows, low, high)
+            distribution, params = resolve_distribution(column, config)
+            if column.kind == KIND_INT:
+                low, high = int(low), int(high)
+            data[column.name] = gen.numeric(
+                rows, low, high, column.kind, distribution, params
+            )
         elif column.kind == KIND_BOOL:
             data[column.name] = gen.boolean_by_ratio(rows, ratio)
 
