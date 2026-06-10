@@ -30,8 +30,8 @@ DEFAULT_OUTPUT_BASE = "output/littlebank"
 
 
 def load_config(path: str) -> dict:
-    with open(path, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def resolve_range(column: Column, config_ranges: dict) -> tuple[float, float]:
@@ -181,7 +181,7 @@ def build_output_path(config: dict) -> str:
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="Generate synthetic littlebank CSV data."
+        description="Generate synthetic LittleBank Case Study CSV data."
     )
     parser.add_argument(
         "--config", required=True, help="Path to the JSON config file."

@@ -2,8 +2,8 @@
 
 Numeric columns are drawn from one of six selectable distributions, then
 clipped to the column's range and rounded according to its type (ints to whole
-numbers, floats to FLOAT_DECIMALS places). Categorical columns are sampled
-uniformly, the unique-ID column is sequential, and the boolean target is
+numbers, floats to FLOAT_DECIMALS places). Categorical columns also can be sampled
+from six selectable distributions. The unique-ID column is sequential, and the boolean target is
 produced from an exact class ratio and shuffled.
 
 Supported distributions (see DISTRIBUTIONS):

@@ -1,6 +1,6 @@
-"""Fixed schema for the littlebank synthetic dataset.
+"""Fixed schema for the LittleBank Case Study synthetic dataset.
 
-Column names, dtypes, categorical value lists, the unique-ID column, and
+Column names, dtypes, categorical value lists, the unique-ID column and
 cross-column rules never change. Only the numeric ranges, the number of rows,
 and the outcome class ratio are configurable at runtime (via the JSON config).
 
@@ -86,5 +86,5 @@ ID_COLUMN = "contact_id"
 # The boolean target column whose True/False ratio is configurable.
 TARGET_COLUMN = "outcome"
 
-# Cross-column rules as (high, low) pairs requiring high > low on every row.
+# Cross-column rules that require high_temp > low_temp on every row.
 GREATER_THAN_RULES = [("high_temp", "low_temp")]
