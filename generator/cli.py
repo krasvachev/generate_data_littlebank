@@ -15,6 +15,7 @@ from . import generators as gen
 from .schema import (
     COLUMNS,
     COLUMN_ORDER,
+    Column,
     GREATER_THAN_RULES,
     KIND_BOOL,
     KIND_CATEGORICAL,
@@ -28,12 +29,12 @@ from .schema import (
 DEFAULT_OUTPUT_BASE = "output/littlebank"
 
 
-def load_config(path):
+def load_config(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as fh:
         return json.load(fh)
 
 
-def resolve_range(column, config_ranges):
+def resolve_range(column: Column, config_ranges: dict) -> tuple[float, float]:
     """Return the (min, max) range for a numeric column.
 
     Uses the config override if present, else the schema default.
@@ -44,7 +45,9 @@ def resolve_range(column, config_ranges):
     return column.default_range
 
 
-def _resolve_distribution(column, config, *, block, global_key, params_key, default):
+def _resolve_distribution(column: Column, config: dict, *, block: str,
+                          global_key: str, params_key: str,
+                          default: str) -> tuple[str, dict]:
     """Return the (distribution, params) for a column.
 
     Precedence: per-column entry in ``block`` > global ``global_key`` >
@@ -56,7 +59,7 @@ def _resolve_distribution(column, config, *, block, global_key, params_key, defa
     return distribution, params
 
 
-def resolve_distribution(column, config):
+def resolve_distribution(column: Column, config: dict) -> tuple[str, dict]:
     """Return the (distribution, params) for a numeric column.
 
     Precedence: per-column 'distribution' in ranges > global 'distribution' >
@@ -68,7 +71,7 @@ def resolve_distribution(column, config):
     )
 
 
-def resolve_categorical_distribution(column, config):
+def resolve_categorical_distribution(column: Column, config: dict) -> tuple[str, dict]:
     """Return the (distribution, params) for a categorical column.
 
     Precedence: per-column entry in the 'categorical' block >
@@ -81,21 +84,22 @@ def resolve_categorical_distribution(column, config):
     )
 
 
-def _check_distribution(dist, label):
-    """Raise ValueError if dist is set and not a known distribution."""
-    if dist is not None and dist not in gen.DISTRIBUTIONS:
+def _check_distribution(distribution, label: str) -> None:
+    """Raise ValueError if distribution is set and not a known distribution."""
+    if distribution is not None and distribution not in gen.DISTRIBUTIONS:
         raise ValueError(
-            f"unknown {label}: {dist!r}. Choose from {sorted(gen.DISTRIBUTIONS)}"
+            f"unknown {label}: {distribution!r}. "
+            f"Choose from {sorted(gen.DISTRIBUTIONS)}"
         )
 
 
-def validate_config(config):
+def validate_config(config: dict) -> None:
     rows = config.get("rows")
     if not isinstance(rows, int) or rows <= 0:
         raise ValueError("config 'rows' must be a positive integer")
 
     ratio = config.get("outcome_true_ratio")
-    if not isinstance(ratio, (int, float)) or not 0 <= ratio <= 1:
+    if not isinstance(ratio, (int, float)) or not (0 <= ratio <= 1):
         raise ValueError("config 'outcome_true_ratio' must be between 0 and 1")
 
     _check_distribution(
@@ -107,8 +111,8 @@ def validate_config(config):
     )
 
     for name, entry in config.get("categorical", {}).items():
-        col = COLUMNS_BY_NAME.get(name)
-        if col is None or col.kind != KIND_CATEGORICAL:
+        column = COLUMNS_BY_NAME.get(name)
+        if column is None or column.kind != KIND_CATEGORICAL:
             raise ValueError(
                 f"config 'categorical' has unknown/non-categorical column: {name!r}"
             )
@@ -118,20 +122,22 @@ def validate_config(config):
 
     config_ranges = config.get("ranges", {})
     for name in config_ranges:
-        col = COLUMNS_BY_NAME.get(name)
-        if col is None or not col.is_numeric:
+        column = COLUMNS_BY_NAME.get(name)
+        if column is None or not column.is_numeric:
             raise ValueError(
                 f"config 'ranges' has unknown/non-numeric column: {name!r}"
             )
-        rng = config_ranges[name]
-        if "min" not in rng or "max" not in rng:
+        range_cfg = config_ranges[name]
+        if "min" not in range_cfg or "max" not in range_cfg:
             raise ValueError(f"range for {name!r} needs both 'min' and 'max'")
-        if float(rng["min"]) > float(rng["max"]):
+        if float(range_cfg["min"]) > float(range_cfg["max"]):
             raise ValueError(f"range for {name!r} has min > max")
-        _check_distribution(rng.get("distribution"), f"distribution for {name!r}")
+        _check_distribution(
+            range_cfg.get("distribution"), f"distribution for {name!r}"
+        )
 
 
-def build_dataframe(config):
+def build_dataframe(config: dict) -> pd.DataFrame:
     rows = config["rows"]
     ratio = config["outcome_true_ratio"]
     config_ranges = config.get("ranges", {})
@@ -167,7 +173,7 @@ def build_dataframe(config):
     return pd.DataFrame(data, columns=COLUMN_ORDER)
 
 
-def output_path(config):
+def build_output_path(config: dict) -> str:
     base = config.get("output_base", DEFAULT_OUTPUT_BASE)
     date_str = dt.date.today().isoformat()
     return f"{base}_{date_str}.csv"
@@ -187,7 +193,7 @@ def main(argv=None):
 
     df = build_dataframe(config)
 
-    path = output_path(config)
+    path = build_output_path(config)
     out_dir = os.path.dirname(path)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
