@@ -28,8 +28,6 @@ POISSON = "poisson"
 BINOMIAL = "binomial"
 RANDOM = "random"  # absolute random == uniform within range
 
-DISTRIBUTIONS = {NORMAL, UNIFORM, EXPONENTIAL, POISSON, BINOMIAL, RANDOM}
-
 DEFAULT_DISTRIBUTION = NORMAL
 
 
@@ -38,28 +36,61 @@ def sequential_ids(rows, start=1):
     return np.arange(start, start + rows, dtype=np.int64)
 
 
+# --- distribution samplers ---------------------------------------------------
+# Each sampler draws raw (unclipped, unrounded) values for ``rows`` draws over
+# the range [low, high], honouring optional per-column ``params``. The
+# DISTRIBUTIONS set is derived from this registry, so the valid names and the
+# implementations can never drift apart.
+
+def _sample_normal(rows, low, high, params):
+    mean = params.get("mean", (low + high) / 2.0)
+    std = params.get("std", (high - low) / 6.0)
+    if std == 0:
+        return np.full(rows, mean, dtype=float)
+    return np.random.normal(loc=mean, scale=std, size=rows)
+
+
+def _sample_uniform(rows, low, high, params):
+    return np.random.uniform(low, high, size=rows)
+
+
+def _sample_exponential(rows, low, high, params):
+    span = high - low
+    scale = params.get("scale", span / 3.0 if span else 1.0)
+    return low + np.random.exponential(scale=scale, size=rows)
+
+
+def _sample_poisson(rows, low, high, params):
+    lam = params.get("lam", (high - low) / 2.0)
+    return low + np.random.poisson(lam=lam, size=rows)
+
+
+def _sample_binomial(rows, low, high, params):
+    n = params.get("n", max(int(round(high - low)), 1))
+    p = params.get("p", 0.5)
+    return low + np.random.binomial(n=n, p=p, size=rows)
+
+
+_SAMPLERS = {
+    NORMAL: _sample_normal,
+    UNIFORM: _sample_uniform,
+    RANDOM: _sample_uniform,  # absolute random == uniform within range
+    EXPONENTIAL: _sample_exponential,
+    POISSON: _sample_poisson,
+    BINOMIAL: _sample_binomial,
+}
+
+# Valid distribution names, derived from the sampler registry above.
+DISTRIBUTIONS = set(_SAMPLERS)
+
+
 def _sample(distribution, rows, low, high, params):
     """Draw raw (unclipped, unrounded) values for the given distribution."""
-    span = high - low
-    if distribution == NORMAL:
-        mean = params.get("mean", (low + high) / 2.0)
-        std = params.get("std", span / 6.0)
-        if std == 0:
-            return np.full(rows, mean, dtype=float)
-        return np.random.normal(loc=mean, scale=std, size=rows)
-    if distribution in (UNIFORM, RANDOM):
-        return np.random.uniform(low, high, size=rows)
-    if distribution == EXPONENTIAL:
-        scale = params.get("scale", span / 3.0 if span else 1.0)
-        return low + np.random.exponential(scale=scale, size=rows)
-    if distribution == POISSON:
-        lam = params.get("lam", span / 2.0)
-        return low + np.random.poisson(lam=lam, size=rows)
-    if distribution == BINOMIAL:
-        n = params.get("n", max(int(round(span)), 1))
-        p = params.get("p", 0.5)
-        return low + np.random.binomial(n=n, p=p, size=rows)
-    raise ValueError(f"unknown distribution: {distribution!r}")
+    try:
+        sampler = _SAMPLERS[distribution]
+    except KeyError:
+        raise ValueError(f"unknown distribution: {distribution!r}")
+    return sampler(rows, low, high, params)
 
 
 def numeric(rows, low, high, kind, distribution=DEFAULT_DISTRIBUTION, params=None):

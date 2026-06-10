@@ -16,7 +16,6 @@ from .schema import (
     COLUMNS,
     COLUMN_ORDER,
     GREATER_THAN_RULES,
-    ID_COLUMN,
     KIND_BOOL,
     KIND_CATEGORICAL,
     KIND_FLOAT,
@@ -45,22 +44,28 @@ def resolve_range(column, config_ranges):
     return column.default_range
 
 
+def _resolve_distribution(column, config, *, block, global_key, params_key, default):
+    """Return the (distribution, params) for a column.
+
+    Precedence: per-column entry in ``block`` > global ``global_key`` >
+    ``default``. Per-column 'params' override the global ``params_key``.
+    """
+    override = config.get(block, {}).get(column.name, {})
+    distribution = override.get("distribution", config.get(global_key, default))
+    params = {**config.get(params_key, {}), **override.get("params", {})}
+    return distribution, params
+
+
 def resolve_distribution(column, config):
     """Return the (distribution, params) for a numeric column.
 
     Precedence: per-column 'distribution' in ranges > global 'distribution' >
     the built-in default. Per-column 'params' override global 'params'.
     """
-    config_ranges = config.get("ranges", {})
-    override = config_ranges.get(column.name, {})
-
-    distribution = override.get(
-        "distribution",
-        config.get("distribution", gen.DEFAULT_DISTRIBUTION),
+    return _resolve_distribution(
+        column, config, block="ranges", global_key="distribution",
+        params_key="params", default=gen.DEFAULT_DISTRIBUTION,
     )
-    params = dict(config.get("params", {}))
-    params.update(override.get("params", {}))
-    return distribution, params
 
 
 def resolve_categorical_distribution(column, config):
@@ -70,16 +75,18 @@ def resolve_categorical_distribution(column, config):
     global 'categorical_distribution' > the default ('uniform', preserving the
     original behaviour). Per-column 'params' override global 'categorical_params'.
     """
-    cat_cfg = config.get("categorical", {})
-    override = cat_cfg.get(column.name, {})
-
-    distribution = override.get(
-        "distribution",
-        config.get("categorical_distribution", gen.UNIFORM),
+    return _resolve_distribution(
+        column, config, block="categorical", global_key="categorical_distribution",
+        params_key="categorical_params", default=gen.UNIFORM,
     )
-    params = dict(config.get("categorical_params", {}))
-    params.update(override.get("params", {}))
-    return distribution, params
+
+
+def _check_distribution(dist, label):
+    """Raise ValueError if dist is set and not a known distribution."""
+    if dist is not None and dist not in gen.DISTRIBUTIONS:
+        raise ValueError(
+            f"unknown {label}: {dist!r}. Choose from {sorted(gen.DISTRIBUTIONS)}"
+        )
 
 
 def validate_config(config):
@@ -91,19 +98,13 @@ def validate_config(config):
     if not isinstance(ratio, (int, float)) or not 0 <= ratio <= 1:
         raise ValueError("config 'outcome_true_ratio' must be between 0 and 1")
 
-    global_dist = config.get("distribution", gen.DEFAULT_DISTRIBUTION)
-    if global_dist not in gen.DISTRIBUTIONS:
-        raise ValueError(
-            f"unknown 'distribution': {global_dist!r}. "
-            f"Choose from {sorted(gen.DISTRIBUTIONS)}"
-        )
-
-    global_cat_dist = config.get("categorical_distribution", gen.UNIFORM)
-    if global_cat_dist not in gen.DISTRIBUTIONS:
-        raise ValueError(
-            f"unknown 'categorical_distribution': {global_cat_dist!r}. "
-            f"Choose from {sorted(gen.DISTRIBUTIONS)}"
-        )
+    _check_distribution(
+        config.get("distribution", gen.DEFAULT_DISTRIBUTION), "'distribution'"
+    )
+    _check_distribution(
+        config.get("categorical_distribution", gen.UNIFORM),
+        "'categorical_distribution'",
+    )
 
     for name, entry in config.get("categorical", {}).items():
         col = COLUMNS_BY_NAME.get(name)
@@ -111,12 +112,9 @@ def validate_config(config):
             raise ValueError(
                 f"config 'categorical' has unknown/non-categorical column: {name!r}"
             )
-        dist = entry.get("distribution")
-        if dist is not None and dist not in gen.DISTRIBUTIONS:
-            raise ValueError(
-                f"unknown categorical distribution for {name!r}: {dist!r}. "
-                f"Choose from {sorted(gen.DISTRIBUTIONS)}"
-            )
+        _check_distribution(
+            entry.get("distribution"), f"categorical distribution for {name!r}"
+        )
 
     config_ranges = config.get("ranges", {})
     for name in config_ranges:
@@ -130,12 +128,7 @@ def validate_config(config):
             raise ValueError(f"range for {name!r} needs both 'min' and 'max'")
         if float(rng["min"]) > float(rng["max"]):
             raise ValueError(f"range for {name!r} has min > max")
-        dist = rng.get("distribution")
-        if dist is not None and dist not in gen.DISTRIBUTIONS:
-            raise ValueError(
-                f"unknown distribution for {name!r}: {dist!r}. "
-                f"Choose from {sorted(gen.DISTRIBUTIONS)}"
-            )
+        _check_distribution(rng.get("distribution"), f"distribution for {name!r}")
 
 
 def build_dataframe(config):
