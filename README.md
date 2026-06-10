@@ -37,6 +37,9 @@ This writes a dated CSV, e.g. `output/littlebank_2026-06-09.csv`
 Only numeric columns can appear under `ranges`. Names, types, and categorical
 values are not configurable.
 
+A companion `config.help.json` documents every key and the available
+distributions. It is reference material only — the generator never reads it.
+
 ## Distributions
 
 Each numeric column is drawn from one of six selectable distributions. A
