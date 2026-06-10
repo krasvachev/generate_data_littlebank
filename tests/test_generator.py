@@ -86,7 +86,7 @@ def test_greater_than_rules(df):
 
 def test_outcome_ratio():
     np.random.seed(1)
-    rows, ratio = 5000, 0.1
+    rows, ratio = 4000, 0.1
     df = build_dataframe(make_config(rows=rows, ratio=ratio))
     assert df[TARGET_COLUMN].dtype == bool
     assert int(df[TARGET_COLUMN].sum()) == round(rows * ratio)

@@ -1,9 +1,8 @@
-# littlebank — Synthetic Data Generator
+# LittleBank - Synthetic Data Generator
 
-A small, configurable Python tool that generates synthetic, bank-marketing-style
-CSV datasets against a **fixed, schema-validated layout** (24 columns). Row
-counts, numeric ranges, statistical distributions, and the class balance of the
-target are all configurable per run via a single JSON file, while column names,
+**A small, configurable Python tool that generates synthetic, bank-marketing-style
+CSV datasets**. The dataset has a **fixed, schema-validated layout** (24 columns). Number of rows, numeric ranges, statistical distributions and the class balance of the
+target are all configurable per run via a single JSON file. On the other side, column names,
 data types, and categorical values are pinned in code so every generated file is
 schema-compatible with the next.
 
@@ -14,41 +13,39 @@ The schema is modeled on the public
 
 ## Why this project exists
 
-This generator is the **upstream data source** for my end-to-end machine-learning
-project:
+This generator is the **upstream data source** for my end-to-end data science project:
 
-> 📊 **[Data-Science-Case-Study](https://github.com/krasvachev/Data-Science-Case-Study)** — exploratory analysis, feature engineering, and predictive modeling on the `littlebank` dataset.
+> 📊 **[Data-Science-Case-Study](https://github.com/krasvachev/Data-Science-Case-Study)** - exploratory analysis, feature engineering and predictive modeling on the `LittleBank` dataset.
 
 Working with synthetic data keeps the two repositories cleanly separated and
 gives me full control over the experiment:
 
-- **Reproducible inputs** — regenerate the exact same shape of data on demand,
-  without redistributing a third-party dataset.
-- **Controlled experiments** — dial the row count, per-column distributions, and
+- **Reproducible inputs** - regenerate the exact same shape of data on demand, without redistributing a third-party dataset.
+- **Controlled experiments** - dial the row count, per-column distributions, and
   the `outcome` class ratio up or down to stress-test models against class
-  imbalance, skew, and scale.
-- **Stable contract** — the fixed schema guarantees that every regenerated CSV
+  imbalance, skew and scale.
+- **Stable contract** - the fixed schema guarantees that every regenerated CSV
   drops straight into the downstream analysis pipeline.
 
 ## Features
 
-- **Fixed 24-column schema** — names, dtypes, and categorical values are defined
-  once in code (see [Schema](#schema)) and never drift between runs.
+- **Fixed 24-column schema** - names, dtypes, and categorical values are defined
+  once in code and never drift between runs.
 - **Six selectable distributions** for every numeric *and* categorical column
   (`normal`, `uniform`, `exponential`, `poisson`, `binomial`, `random`).
-- **Global + per-column configuration** — set a default distribution for all
+- **Global + per-column configuration** - set a default distribution for all
   columns and override individual ones.
-- **Exact target class balance** — the boolean `outcome` column gets precisely
+- **Exact target class balance** - the boolean `outcome` column gets precisely
   `round(rows × ratio)` `True` values.
-- **Built-in integrity rules** — unique sequential IDs and an enforced
+- **Built-in integrity rules** - unique sequential IDs and an enforced
   `high_temp > low_temp` cross-column constraint.
-- **Validated config** — invalid distributions, unknown columns, and bad ranges
+- **Validated config** - invalid distributions, unknown columns, and bad ranges
   fail fast with clear error messages.
-- **Tested** — a `pytest` suite verifies schema, ranges, formatting, and rules.
+- **Tested** - a `pytest` suite verifies schema, ranges, formatting, and rules.
 
 ## Requirements
 
-- Python 3.10+ (the code uses `X | Y` type-hint syntax)
+- Python 3.10+
 - [pandas](https://pandas.pydata.org/) ≥ 2.0 and [NumPy](https://numpy.org/) ≥ 1.24
 
 ## Installation
@@ -67,8 +64,8 @@ Generate a dataset from a config file:
 python -m generator.cli --config config.example.json
 ```
 
-This writes a dated CSV — e.g. `output/littlebank_2026-06-10.csv` — that is
-comma-delimited, UTF-8 encoded, has a header row, and no index column. On
+This writes a dated CSV - e.g. `output/littlebank_2026-06-10.csv`. The file is
+comma-delimited, UTF-8 encoded, has a header row and no index column. On
 completion the tool prints the row count and the `outcome` class split:
 
 ```
@@ -78,23 +75,23 @@ Wrote 1000 rows to output/littlebank_2026-06-10.csv (100 True / 900 False on out
 ## Configuration
 
 Runs are driven entirely by a JSON config (see `config.example.json`). Only the
-keys below are configurable — column names, data types, and the set of allowed
+keys below are configurable - column names, data types and the set of allowed
 categorical values are fixed in the schema and cannot be changed at runtime.
 
 | Key | Required | Meaning |
 |-----|----------|---------|
 | `rows` | ✅ | Number of rows to generate (positive integer). |
-| `outcome_true_ratio` | ✅ | Fraction of `outcome` values that are `True` (0–1). e.g. `0.1` → 10% `True`, 90% `False`. |
-| `output_base` | — | Output path prefix; the run date and `.csv` are appended. Defaults to `output/littlebank`. |
-| `distribution` | — | Global default distribution for all numeric columns. Defaults to `normal`. |
-| `params` | — | Global default distribution parameters for numeric columns. |
-| `ranges` | — | Per-column numeric overrides: `{ "min", "max", "distribution", "params" }`. Omit a column to use its schema default. |
-| `categorical_distribution` | — | Global default distribution for all categorical columns. Defaults to `uniform`. |
-| `categorical_params` | — | Global default distribution parameters for categorical columns. |
-| `categorical` | — | Per-column categorical overrides: `{ "distribution", "params" }`, keyed by column name. |
+| `outcome_true_ratio` | ✅ | Fraction of `outcome` values that are `True`, e.g. `0.1` → 10% `True`, 90% `False`. |
+| `output_base` | - | Output path prefix; the run date and `.csv` are appended. Defaults to `output/littlebank`. |
+| `distribution` | - | Global default distribution for all numeric columns. Defaults to `normal`. |
+| `params` | - | Global default distribution parameters for numeric columns. |
+| `ranges` | - | Per-column numeric overrides: `{ "min", "max", "distribution", "params" }`. Omit a column to use its schema default. |
+| `categorical_distribution` | - | Global default distribution for all categorical columns. Defaults to `uniform`. |
+| `categorical_params` | - | Global default distribution parameters for categorical columns. |
+| `categorical` | - | Per-column categorical overrides: `{ "distribution", "params" }`, keyed by column name. |
 
 A companion `config.help.json` documents every key and the available
-distributions. It is **reference material only** — the generator never reads it.
+distributions. It is **reference material only** - the generator never reads it.
 
 ### Distributions
 
@@ -107,13 +104,13 @@ type (ints to whole numbers, floats to 4 decimals).
 | Name | Shape | Default parameters | Optional `params` |
 |------|-------|--------------------|-------------------|
 | `normal` | Gaussian, centred on the range midpoint | `std = range/6` | `mean`, `std` |
-| `uniform` | Flat across `[min, max]` | — | — |
+| `uniform` | Flat across `[min, max]` | - | - |
 | `exponential` | Right-skewed, anchored at `min` | `scale = range/3` | `scale` |
 | `poisson` | Discrete counts, anchored at `min` | `lam = range/2` | `lam` |
 | `binomial` | Discrete, anchored at `min` | `n = round(range)`, `p = 0.5` | `n`, `p` |
-| `random` | Uniform within range (the "absolute random" mode; alias of `uniform`) | — | — |
+| `random` | Uniform within range (the "absolute random" mode; alias of `uniform`) | - | - |
 
-**Numeric example** — a global default with per-column overrides:
+**Numeric example** - a global default with per-column overrides:
 
 ```json
 {
@@ -151,55 +148,21 @@ equally (the default).
 
 ## How values are generated
 
-- **`contact_id`** — unique sequential integers starting at 1.
-- **Categorical columns** — sampled from their fixed allowed values, uniformly by
+- **`contact_id`** - unique sequential integers starting at 1.
+- **Categorical columns** - sampled from their fixed allowed values, uniformly by
   default or shaped by a configurable distribution (see
   [Categorical columns](#categorical-columns)).
-- **Numeric columns** — drawn from a configurable distribution (see
+- **Numeric columns** - drawn from a configurable distribution (see
   [Distributions](#distributions)), clipped to `[min, max]`. Integers are rounded
   to whole numbers; floats are rounded to 4 decimal places.
-- **`outcome`** (boolean target) — exactly `round(rows × outcome_true_ratio)`
+- **`outcome`** (boolean target) - exactly `round(rows × outcome_true_ratio)`
   `True` values, shuffled across the rows.
-- **Cross-column rule** — `high_temp > low_temp` is enforced on every row.
-
-## Schema
-
-The full, ordered schema is defined authoritatively in
-[`generator/schema.py`](generator/schema.py). The `min`/`max` shown below are the
-**default ranges**, which the config may override; names, types, and categories
-are fixed.
-
-| # | Column | Type | Categories / default range |
-|---|--------|------|----------------------------|
-| 1 | `contact_id` | id | unique sequential integer, starting at 1 |
-| 2 | `month` | categorical | `jan … dec` (12 values) |
-| 3 | `day_of_week` | categorical | `mon … sun` (7 values) |
-| 4 | `contact` | categorical | `mobile`, `landline` |
-| 5 | `num_contacts` | int | `1 … 10` |
-| 6 | `days_since_previous` | int | `0 … 30` |
-| 7 | `num_contacts_previous` | int | `0 … 10` |
-| 8 | `outcome_previous` | categorical | `failure`, `nonexistent`, `success` |
-| 9 | `age` | int | `16 … 80` |
-| 10 | `marital` | categorical | `married`, `single`, `divorced`, `unknown` |
-| 11 | `job` | categorical | `industrial`, `unemployed`, `administrative`, `professional`, `technical`, `retired`, `unknown`, `entrepreneur`, `management`, `tradesman`, `domestic`, `full_time_education` |
-| 12 | `education` | categorical | `4years`, `university.degree`, `high.school`, `9years`, `postgrad`, `6years`, `unknown`, `none` |
-| 13 | `default` | categorical | `unknown`, `no`, `yes` |
-| 14 | `mortgage` | categorical | `no`, `yes`, `unknown` |
-| 15 | `personal_loan` | categorical | `no`, `yes`, `unknown` |
-| 16 | `call_centre_volume` | float | `0.0 … 15.0` |
-| 17 | `high_temp` | int | `-2 … 45` (always `> low_temp`) |
-| 18 | `low_temp` | int | `-15 … 20` |
-| 19 | `forward_rate` | float | `0.05 … 5.05` |
-| 20 | `num_employed` | float | `23040.0 … 24269.0` |
-| 21 | `consumer_confidence` | float | `-50.0 … -26.0` |
-| 22 | `price_index` | float | `253.0 … 261.0` |
-| 23 | `employment_variation` | float | `-3.04 … 1.26` |
-| 24 | `outcome` | bool | binary target (class ratio configurable) |
+- **Cross-column rule** - `high_temp > low_temp` is enforced on every row.
 
 ## Reproducibility
 
 Sampling uses NumPy's global random state. The CLI does **not** seed it, so each
-run produces a fresh, independent dataset — the dated output filename keeps
+run produces a fresh, independent dataset. The dated output filename keeps
 successive runs from overwriting one another.
 
 If you need byte-for-byte reproducible output (e.g. to pin the dataset behind the
@@ -253,4 +216,4 @@ Released under the [MIT License](LICENSE). © 2026 Krasimir Vachev.
 
 ## Author
 
-**Krasimir Vachev** — [@krasvachev](https://github.com/krasvachev)
+**Krasimir Vachev** - [@krasvachev](https://github.com/krasvachev)
