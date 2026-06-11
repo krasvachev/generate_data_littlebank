@@ -52,10 +52,24 @@ gives me full control over the experiment:
 
 ## Installation
 
+The first step is to clone the Repo and create a virtual environment.
+
 ```bash
 git clone https://github.com/krasvachev/generate_data_littlebank.git
-cd generate_data_littlebank
+cd generate_data_littlebank   # The path where you clone the Repo         
+```
+
+```bash
+py -3.11 -m venv .venv
+.venv\Scripts\activate
+python --version              
+```
+
+Afterwards, you should install the requirements.txt and then run the generator:
+
+```bash
 pip install -r requirements.txt
+python -m generator.cli --config config.example.json
 ```
 
 ## Usage
