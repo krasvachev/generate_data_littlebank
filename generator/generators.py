@@ -135,6 +135,36 @@ def boolean_by_ratio(rows: int, true_ratio: float) -> np.ndarray:
     return values
 
 
+def boolean_dependent(rows: int, true_ratio: float,
+                      weights: np.ndarray) -> np.ndarray:
+    """Boolean target whose Trues are biased toward high-weight rows.
+
+    Produces exactly round(rows * true_ratio) Trues (same guarantee as
+    boolean_by_ratio), but instead of scattering them uniformly the rows are
+    selected by weighted sampling without replacement: each row i is assigned a
+    key e_i / weights[i] with e_i ~ Exp(1), and the n_true rows with the
+    smallest keys become True. A row's chance of selection is proportional to
+    its weight, so larger weights mean a higher True rate. With all weights
+    equal this reduces to uniform selection (i.e. boolean_by_ratio).
+    """
+    n_true = int(round(rows * true_ratio))
+    values = np.zeros(rows, dtype=bool)
+    if n_true <= 0:
+        return values
+    if n_true >= rows:
+        values[:] = True
+        return values
+    weights = np.asarray(weights, dtype=float)
+    # Exponential keys divided by weight: smallest keys win, so higher weight
+    # means a smaller expected key and a better chance of selection. Zero-weight
+    # rows get an infinite key (never chosen unless n_true forces it).
+    with np.errstate(divide="ignore"):
+        keys = np.random.exponential(size=rows) / weights
+    chosen = np.argpartition(keys, n_true)[:n_true]
+    values[chosen] = True
+    return values
+
+
 def enforce_greater_than(high_vals: np.ndarray, low_vals: np.ndarray,
                          high_low: int, high_high: int) -> np.ndarray:
     """Ensure high_vals > low_vals element-wise within [high_low, high_high].

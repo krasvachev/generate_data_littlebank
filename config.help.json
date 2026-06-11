@@ -10,5 +10,6 @@
     "binomial": "Discrete, centred (n = round(range), p = 0.5).",
     "random": "Uniform within range / across categories (the 'absolute random' mode; alias of uniform)."
   },
-  "optional_params": "Each ranges/categorical entry may include a 'params' object to tune a distribution, e.g. normal: {mean, std}; exponential: {scale}; poisson: {lam}; binomial: {n, p}."
+  "optional_params": "Each ranges/categorical entry may include a 'params' object to tune a distribution, e.g. normal: {mean, std}; exponential: {scale}; poisson: {lam}; binomial: {n, p}.",
+  "outcome_model": "Optional. Makes the 'outcome' target depend on feature columns instead of being uniformly random. Under 'weights', map each categorical driver column to {category: weight}. Weights are RELATIVE propensities (not literal rates); categories not listed default to 1.0. A row's selection weight is the PRODUCT of its drivers' weights, and the rows with the largest weights are more likely to be True. The total number of Trues stays exactly round(rows * outcome_true_ratio). Omit 'outcome_model' to keep the default uniform behaviour."
 }

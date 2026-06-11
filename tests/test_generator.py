@@ -249,3 +249,97 @@ def test_invalid_categorical_distribution_rejected():
             "outcome_true_ratio": 0.1,
             "categorical": {"age": {"distribution": "normal"}},
         })
+
+
+# --- dependent outcome target (outcome_model) ---
+
+def make_model_config(rows=5000, ratio=0.1, weights=None):
+    config = make_config(rows=rows, ratio=ratio)
+    if weights is not None:
+        config["outcome_model"] = {"weights": weights}
+    return config
+
+
+def test_outcome_model_preserves_exact_count():
+    np.random.seed(10)
+    rows, ratio = 5000, 0.1
+    df = build_dataframe(make_model_config(
+        rows=rows, ratio=ratio,
+        weights={"contact": {"mobile": 5.0, "landline": 1.0}},
+    ))
+    assert df[TARGET_COLUMN].dtype == bool
+    assert int(df[TARGET_COLUMN].sum()) == round(rows * ratio)
+
+
+def test_outcome_model_creates_dependence():
+    """A high-weight category gets a higher realized True rate."""
+    np.random.seed(11)
+    df = build_dataframe(make_model_config(
+        weights={"contact": {"mobile": 5.0, "landline": 1.0}},
+    ))
+    mobile_rate = df.loc[df["contact"] == "mobile", TARGET_COLUMN].mean()
+    landline_rate = df.loc[df["contact"] == "landline", TARGET_COLUMN].mean()
+    assert mobile_rate > landline_rate
+
+
+def test_outcome_model_combines_multiplicatively():
+    """Weights from two driver columns compound (product)."""
+    np.random.seed(12)
+    df = build_dataframe(make_model_config(
+        rows=8000, ratio=0.25,
+        weights={
+            "contact": {"mobile": 4.0, "landline": 1.0},
+            "month": {"may": 4.0},
+        },
+    ))
+    best = df[(df["contact"] == "mobile") & (df["month"] == "may")]
+    worst = df[(df["contact"] == "landline") & (df["month"] != "may")]
+    assert best[TARGET_COLUMN].mean() > worst[TARGET_COLUMN].mean()
+
+
+def test_outcome_model_equal_weights_match_uniform_count():
+    """Equal weights still yield the exact count (reduces to uniform)."""
+    np.random.seed(13)
+    rows, ratio = 4000, 0.2
+    df = build_dataframe(make_model_config(
+        rows=rows, ratio=ratio,
+        weights={"contact": {"mobile": 1.0, "landline": 1.0}},
+    ))
+    assert int(df[TARGET_COLUMN].sum()) == round(rows * ratio)
+
+
+def test_boolean_dependent_extremes():
+    weights = np.ones(100)
+    assert gen.boolean_dependent(100, 0.0, weights).sum() == 0
+    assert gen.boolean_dependent(100, 1.0, weights).sum() == 100
+
+
+def test_outcome_model_validation_rejects_bad_config():
+    base = {"rows": 10, "outcome_true_ratio": 0.1}
+    # Unknown column.
+    with pytest.raises(ValueError):
+        validate_config({**base, "outcome_model": {"weights": {"nope": {}}}})
+    # Non-categorical column.
+    with pytest.raises(ValueError):
+        validate_config({**base, "outcome_model": {"weights": {"age": {"1": 2.0}}}})
+    # Unknown category value.
+    with pytest.raises(ValueError):
+        validate_config({
+            **base, "outcome_model": {"weights": {"contact": {"fax": 2.0}}},
+        })
+    # Negative weight.
+    with pytest.raises(ValueError):
+        validate_config({
+            **base, "outcome_model": {"weights": {"contact": {"mobile": -1.0}}},
+        })
+    # weights must be an object.
+    with pytest.raises(ValueError):
+        validate_config({**base, "outcome_model": {"weights": []}})
+
+
+def test_outcome_model_valid_config_passes():
+    validate_config({
+        "rows": 10,
+        "outcome_true_ratio": 0.1,
+        "outcome_model": {"weights": {"contact": {"mobile": 2.0}}},
+    })
