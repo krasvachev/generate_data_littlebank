@@ -1,4 +1,8 @@
 {
+  "_help": {
+    "note": "JSON has no comments; this _help block is documentation only and is ignored by the generator.",
+    "outcome_model": "Makes the 'outcome' target depend on feature columns instead of being uniformly random. Under 'weights', map each categorical driver column to {category: weight}. Weights are RELATIVE propensities (not literal rates); categories not listed default to 1.0. A row's selection weight is the PRODUCT of its drivers' weights, and the rows with the largest weights are more likely to be True. The total number of Trues stays exactly round(rows * outcome_true_ratio). Omit 'outcome_model' to keep the default uniform behaviour."
+  },
   "rows": 1000,
   "outcome_true_ratio": 0.1,
   "output_base": "output/littlebank",
@@ -16,5 +20,11 @@
     "consumer_confidence": {"min": -50.0, "max": -26.0},
     "price_index": {"min": 253.0, "max": 261.0},
     "employment_variation": {"min": -3.04, "max": 1.26}
+  },
+  "outcome_model": {
+    "weights": {
+      "contact": {"mobile": 2.0, "landline": 1.0},
+      "month": {"may": 3.0, "jun": 2.0, "dec": 0.5}
+    }
   }
 }

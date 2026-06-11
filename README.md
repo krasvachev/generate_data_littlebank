@@ -30,6 +30,7 @@ This writes a dated CSV, e.g. `output/littlebank_2026-06-09.csv`
 | `distribution` | Global default distribution for all numeric columns (see below). |
 | `params` | Optional global distribution parameters (see below). |
 | `ranges` | Optional per-column numeric `{ "min", "max", "distribution", "params" }` overrides. Omit a column to use its schema default. |
+| `outcome_model` | Optional. Makes `outcome` depend on feature columns (see [Dependent outcome target](#dependent-outcome-target)). Omit for the default uniform behaviour. |
 
 Only numeric columns can appear under `ranges`. Names, types, and categorical
 values are not configurable.
@@ -68,6 +69,36 @@ Example — global default with per-column overrides:
 }
 ```
 
+## Dependent outcome target
+
+By default `outcome` is uniformly random — it carries no signal about any
+feature column, so a model trained on the data finds nothing to learn. Add an
+`outcome_model` block to make `outcome` **depend** on one or more categorical
+columns while keeping the exact True count.
+
+```json
+"outcome_model": {
+  "weights": {
+    "contact": {"mobile": 2.0, "landline": 1.0},
+    "month":   {"may": 3.0, "jun": 2.0, "dec": 0.5}
+  }
+}
+```
+
+- Each driver column maps categories to **relative weights** (propensities, not
+  literal rates). Categories you don't list default to weight `1.0`.
+- A row's selection weight is the **product** of its drivers' weights. With the
+  example above, a `contact=mobile, month=may` row has weight `2.0 × 3.0 = 6.0`,
+  while a `contact=landline, month=dec` row has `1.0 × 0.5 = 0.5` — making it
+  12× less likely to be `True`.
+- The total number of `True` values is still **exactly**
+  `round(rows * outcome_true_ratio)`; the weights only steer *which* rows are
+  chosen (weighted sampling without replacement). Equal weights everywhere
+  reproduce the default uniform behaviour.
+
+Only **categorical** columns may be used as drivers, and listed categories must
+exist in the schema. Weights must be non-negative numbers.
+
 ## How values are generated
 
 - **`contact_id`** — unique sequential integers starting at 1.
@@ -76,7 +107,9 @@ Example — global default with per-column overrides:
   [Distributions](#distributions)), clipped to `[min, max]`. Integers are
   rounded; floats are rounded to 4 decimal places.
 - **`outcome`** (boolean target) — exactly `round(rows * outcome_true_ratio)`
-  `True` values, shuffled across the rows.
+  `True` values. By default these are shuffled uniformly across the rows; with
+  an `outcome_model` they are biased toward high-weight rows (see
+  [Dependent outcome target](#dependent-outcome-target)).
 - **Cross-column rule** — `high_temp > low_temp` is enforced on every row.
 
 ## Schema
