@@ -9,6 +9,7 @@ import datetime as dt
 import json
 import os
 
+import numpy as np
 import pandas as pd
 
 from . import generators as gen
@@ -84,6 +85,29 @@ def resolve_categorical_distribution(column: Column, config: dict) -> tuple[str,
     )
 
 
+def resolve_outcome_weights(config: dict, data: dict, rows: int):
+    """Return per-row selection weights for the outcome target, or None.
+
+    Returns None when the config has no 'outcome_model', meaning the outcome
+    should be generated with the default uniform behaviour. Otherwise returns a
+    float array of length ``rows`` where each entry is the product of the
+    per-category weights of that row's driver columns (categories not listed in
+    the model default to weight 1.0).
+    """
+    model = config.get("outcome_model")
+    if not model:
+        return None
+
+    weights = np.ones(rows, dtype=float)
+    for col_name, group_weights in model.get("weights", {}).items():
+        values = np.asarray(data[col_name], dtype=object)
+        mapped = np.array(
+            [float(group_weights.get(v, 1.0)) for v in values], dtype=float
+        )
+        weights = weights * mapped
+    return weights
+
+
 def _check_distribution(distribution, label: str) -> None:
     """Raise ValueError if distribution is set and not a known distribution."""
     if distribution is not None and distribution not in gen.DISTRIBUTIONS:
@@ -136,6 +160,46 @@ def validate_config(config: dict) -> None:
             range_cfg.get("distribution"), f"distribution for {name!r}"
         )
 
+    _validate_outcome_model(config.get("outcome_model"))
+
+
+def _validate_outcome_model(model) -> None:
+    """Validate the optional 'outcome_model' block (no-op when absent)."""
+    if model is None:
+        return
+    if not isinstance(model, dict):
+        raise ValueError("config 'outcome_model' must be an object")
+    weights = model.get("weights", {})
+    if not isinstance(weights, dict):
+        raise ValueError("config 'outcome_model.weights' must be an object")
+    for name, group_weights in weights.items():
+        column = COLUMNS_BY_NAME.get(name)
+        if column is None or column.kind != KIND_CATEGORICAL:
+            raise ValueError(
+                "config 'outcome_model.weights' has unknown/non-categorical "
+                f"column: {name!r}"
+            )
+        if not isinstance(group_weights, dict):
+            raise ValueError(
+                f"outcome_model weights for {name!r} must be an object "
+                "mapping category -> number"
+            )
+        for category, weight in group_weights.items():
+            if category not in column.categories:
+                raise ValueError(
+                    f"outcome_model weights for {name!r} has unknown category: "
+                    f"{category!r}"
+                )
+            if isinstance(weight, bool) or not isinstance(weight, (int, float)):
+                raise ValueError(
+                    f"outcome_model weight for {name!r}/{category!r} must be a number"
+                )
+            if weight < 0:
+                raise ValueError(
+                    f"outcome_model weight for {name!r}/{category!r} must not "
+                    "be negative"
+                )
+
 
 def build_dataframe(config: dict) -> pd.DataFrame:
     rows = config["rows"]
@@ -160,7 +224,11 @@ def build_dataframe(config: dict) -> pd.DataFrame:
                 rows, low, high, column.kind, distribution, params
             )
         elif column.kind == KIND_BOOL:
-            data[column.name] = gen.boolean_by_ratio(rows, ratio)
+            weights = resolve_outcome_weights(config, data, rows)
+            if weights is None:
+                data[column.name] = gen.boolean_by_ratio(rows, ratio)
+            else:
+                data[column.name] = gen.boolean_dependent(rows, ratio, weights)
 
     # Enforce cross-column rules (e.g. high_temp > low_temp).
     for high_name, low_name in GREATER_THAN_RULES:
