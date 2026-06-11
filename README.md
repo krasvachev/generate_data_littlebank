@@ -47,8 +47,8 @@ gives me full control over the experiment:
 
 ## Requirements
 
-- Python 3.10+
-- [pandas](https://pandas.pydata.org/) ≥ 2.0 and [NumPy](https://numpy.org/) ≥ 1.24
+- Python 3.11+
+- [pandas](https://pandas.pydata.org/) ≥ 2.2 and [NumPy](https://numpy.org/) ≥ 1.26
 
 ## Installation
 
@@ -153,7 +153,7 @@ equally (the default).
 
 By default `outcome` is uniformly random - it carries no signal about any feature
 column, so a model trained on the data has nothing to learn. Add an
-`outcome_model` block to make `outcome` **depend** on one or more categorical
+`outcome_model` block to make `outcome` **to depends** on one or more categorical
 columns while keeping the exact `True` count.
 
 ```json
@@ -247,7 +247,7 @@ pytest
 The suite verifies column order, row count, value ranges, integer/float
 formatting, `contact_id` uniqueness, valid categorical values, the
 `high_temp > low_temp` rule, the `outcome` class ratio, that every distribution
-(numeric and categorical) stays within its allowed values, and that the optional
+(numeric and categorical) stays within its allowed values. The optional
 `outcome_model` biases the target while preserving the exact class balance.
 
 ## License
